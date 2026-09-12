@@ -1,0 +1,60 @@
+[project]
+name = "logistics-pricing-platform"
+version = "0.1.0"
+description = "Production-grade logistics pricing platform"
+requires-python = ">=3.10"
+
+dependencies = [
+
+]
+
+[project.optional-dependencies]
+test = [
+    "mypy",
+    "ruff",
+]
+
+dev = [
+    "mypy",
+    "ruff",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "UP",
+    "B",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "unit: Unit tests",
+    "integration: Integration tests",
+    "platform: Platform validation tests",
+    "spark: Spark validation tests",
+]
+
+[tool.mypy]
+strict = true
+warn_unused_ignores = true
+disallow_any_generics = true
+show_error_codes = true
+pretty = true
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
