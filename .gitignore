@@ -2,13 +2,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
 *.pyc
 
 # Virtual enviroment
 venv/
-.env/
 .venv/
+
+
+# Environment variables
 .env
+.env.*
+!.env.example
+!.env.test.example
 
 # PyCharm
 .idea/

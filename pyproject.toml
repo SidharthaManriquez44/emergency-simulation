@@ -1,23 +1,36 @@
 [project]
-name = "logistics-pricing-platform"
+name = "emergency-simualtion"
 version = "0.1.0"
-description = "Production-grade logistics pricing platform"
+description = "Optimization of the Care Process in the Emergency Department of a Private Tertiary-Care Hospital"
 requires-python = ">=3.10"
 
 dependencies = [
+    "sqlfluff",
 
 ]
 
 [project.optional-dependencies]
 test = [
+    "pytest-cov-7.1.0",
+    "pytest-9.1.1",
+    "sqlfluff",
     "mypy",
     "ruff",
+
 ]
 
 dev = [
     "mypy",
     "ruff",
+    "sqlfluff",
 ]
+
+[tool.sqlfluff.core]
+dialect = "postgres"
+large_file_skip_byte_limit = 100000
+
+[tool.sqlfluff.rules.references.keywords]
+ignore_words = "name,content,location,configuration"
 
 [tool.ruff]
 line-length = 88
