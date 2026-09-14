@@ -1,64 +1,14 @@
-import uuid
-
 import psycopg
 import pytest
 from psycopg.types.json import Json
 
-
-def unique_email() -> str:
-    return f"test_{uuid.uuid4().hex}@example.com"
-
-
-def unique_code() -> str:
-    return f"TEST_{uuid.uuid4().hex[:12]}"
-
-
-def create_user(connection):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO auth.users (
-                email,
-                password_hash,
-                first_name,
-                last_name
-            )
-            VALUES (
-                %s,
-                'test-password-hash',
-                'Test',
-                'User'
-            )
-            RETURNING user_id
-            """,
-            (unique_email(),),
-        )
-
-        return cursor.fetchone()[0]
-
-
-def create_project(connection):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """INSERT INTO research.projects (
-                    project_code,
-                    name,
-                    description
-                )
-                VALUES (
-                    %s,
-                    %s,
-                    'Test project'
-            )
-            RETURNING project_id
-            """,
-            (
-                unique_code(),
-                "Test Project",
-            ),
-        )
-
-        return cursor.fetchone()[0]
+from tests.database.helpers import (
+    create_authority_rule,
+    create_project,
+    create_user,
+    unique_code,
+    unique_email,
+)
 
 
 def test_user_email_is_unique(database_connection):
@@ -472,106 +422,6 @@ def test_triangular_distribution_requires_all_parameters(
                 """,
                 (variable_id,),
             )
-
-
-def create_profession(connection):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO auth.professions (
-                code,
-                name,
-                professional_group
-            )
-            VALUES (
-                %s,
-                %s,
-                %s
-            )
-            RETURNING profession_id
-            """,
-            (
-                unique_code(),
-                "Test Profession",
-                "Test Group",
-            ),
-        )
-
-        return cursor.fetchone()[0]
-
-
-def create_clinical_domain(connection):
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO clinical.clinical_domains (
-                code,
-                name
-            )
-            VALUES (
-                %s,
-                %s
-            )
-            RETURNING clinical_domain_id
-            """,
-            (
-                unique_code(),
-                "Test Clinical Domain",
-            ),
-        )
-
-        return cursor.fetchone()[0]
-
-
-def create_authority_rule(
-    connection,
-    *,
-    authority_level="L1",
-    can_review=True,
-    can_validate=False,
-    review_scope="Test review scope",
-    rule_version=1,
-):
-    profession_id = create_profession(connection)
-    clinical_domain_id = create_clinical_domain(connection)
-
-    with connection.cursor() as cursor:
-        cursor.execute(
-            """
-            INSERT INTO clinical.authority_rules (
-                profession_id,
-                specialty_id,
-                clinical_domain_id,
-                authority_level,
-                can_review,
-                can_validate,
-                review_scope,
-                rule_version
-            )
-            VALUES (
-                %s,
-                NULL,
-                %s,
-                %s,
-                %s,
-                %s,
-                %s,
-                %s
-            )
-            RETURNING authority_rule_id
-            """,
-            (
-                profession_id,
-                clinical_domain_id,
-                authority_level,
-                can_review,
-                can_validate,
-                review_scope,
-                rule_version,
-            ),
-        )
-
-        return cursor.fetchone()[0]
 
 
 def test_authority_level_must_be_valid(database_connection):
