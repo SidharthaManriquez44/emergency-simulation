@@ -53,7 +53,10 @@ def create_project(connection):
         return cursor.fetchone()[0]
 
 
-def create_model_item(connection):
+def create_model_item(
+    connection,
+    item_type="VARIABLE",
+):
     user_id = create_user(connection)
     project_id = create_project(connection)
 
@@ -73,7 +76,7 @@ def create_model_item(connection):
             (
                 project_id,
                 unique_code(),
-                "VARIABLE",
+                item_type,
                 "Test Variable",
                 user_id,
             ),

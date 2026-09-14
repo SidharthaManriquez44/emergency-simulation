@@ -1,6 +1,7 @@
 import psycopg
 import pytest
 from psycopg.errors import CheckViolation, ForeignKeyViolation, RaiseException
+from psycopg.types.json import Json
 
 from tests.database.helpers import (
     create_authority_rule,
@@ -1457,3 +1458,810 @@ def test_clinical_observation_allows_valid_observation(
     ).fetchone()[0]
 
     assert observation_id is not None
+
+
+def test_clinical_rule_requires_existing_model_item_version(
+    database_connection,
+):
+    nonexistent_version_id = nonexistent_id(
+        database_connection,
+        "research.model_item_versions",
+        "model_item_version_id",
+    )
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.clinical_rules (
+                model_item_version_id,
+                rule_expression
+            )
+            VALUES (%s, %s)
+            """,
+            (
+                nonexistent_version_id,
+                Json({"condition": "test"}),
+            ),
+        )
+
+
+def test_clinical_rule_model_item_version_is_unique(
+    database_connection,
+):
+    model_item_id, creator_user_id = create_model_item(
+        database_connection,
+        item_type="CLINICAL_RULE",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        creator_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.clinical_rules (
+            model_item_version_id,
+            rule_expression
+        )
+        VALUES (%s, %s)
+        """,
+        (
+            version_id,
+            Json({"condition": "first"}),
+        ),
+    )
+
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.clinical_rules (
+                model_item_version_id,
+                rule_expression
+            )
+            VALUES (%s, %s)
+            """,
+            (
+                version_id,
+                Json({"condition": "second"}),
+            ),
+        )
+
+
+def test_clinical_rule_requires_rule_expression(
+    database_connection,
+):
+    model_item_id, creator_user_id = create_model_item(
+        database_connection,
+        item_type="CLINICAL_RULE",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        creator_user_id,
+        1,
+    )
+
+    with pytest.raises(psycopg.errors.NotNullViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.clinical_rules (
+                model_item_version_id
+            )
+            VALUES (%s)
+            """,
+            (version_id,),
+        )
+
+
+def test_clinical_rule_allows_valid_rule(
+    database_connection,
+):
+    model_item_id, creator_user_id = create_model_item(
+        database_connection,
+        item_type="CLINICAL_RULE",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        creator_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.clinical_rules (
+            model_item_version_id,
+            rule_expression,
+            description
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            version_id,
+            Json(
+                {
+                    "condition": "patient_stable",
+                    "action": "eligible_for_observation",
+                }
+            ),
+            "Test clinical rule.",
+        ),
+    )
+
+    row = database_connection.execute(
+        """
+        SELECT model_item_version_id, rule_expression, description
+        FROM clinical.clinical_rules
+        WHERE model_item_version_id = %s
+        """,
+        (version_id,),
+    ).fetchone()
+
+    assert row is not None
+    assert row[0] == version_id
+    assert row[1] == {
+        "condition": "patient_stable",
+        "action": "eligible_for_observation",
+    }
+    assert row[2] == "Test clinical rule."
+
+
+def test_diagnosis_requires_existing_model_item_version(database_connection):
+
+    nonexistent_version_id = nonexistent_id(
+        database_connection,
+        "research.model_item_versions",
+        "model_item_version_id",
+    )
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.diagnoses (
+                model_item_version_id,
+                diagnosis_code,
+                name
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                nonexistent_version_id,
+                "TEST-001",
+                "Test diagnosis",
+            ),
+        )
+
+
+def test_diagnosis_model_item_version_requires_diagnosis_type(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="VARIABLE",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    with pytest.raises(
+        psycopg.errors.RaiseException,
+        match="requires type DIAGNOSIS",
+    ):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.diagnoses (
+                model_item_version_id,
+                diagnosis_code,
+                name
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                version_id,
+                "TEST-001",
+                "Test diagnosis",
+            ),
+        )
+
+
+def test_diagnosis_model_item_version_is_unique(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            version_id,
+            "TEST-001",
+            "Test diagnosis",
+        ),
+    )
+
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.diagnoses (
+                model_item_version_id,
+                diagnosis_code,
+                name
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                version_id,
+                "TEST-002",
+                "Another diagnosis",
+            ),
+        )
+
+
+def test_diagnosis_requires_diagnosis_code(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    with pytest.raises(psycopg.errors.NotNullViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.diagnoses (
+                model_item_version_id,
+                diagnosis_code,
+                name
+            )
+            VALUES (%s, NULL, %s)
+            """,
+            (
+                version_id,
+                "Test diagnosis",
+            ),
+        )
+
+
+def test_diagnosis_requires_name(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    with pytest.raises(psycopg.errors.NotNullViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.diagnoses (
+                model_item_version_id,
+                diagnosis_code,
+                name
+            )
+            VALUES (%s, %s, NULL)
+            """,
+            (
+                version_id,
+                "TEST-001",
+            ),
+        )
+
+
+def test_diagnosis_allows_valid_diagnosis(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name,
+            description
+        )
+        VALUES (%s, %s, %s, %s)
+        """,
+        (
+            version_id,
+            "TEST-001",
+            "Test diagnosis",
+            "Test diagnosis description",
+        ),
+    )
+
+    row = database_connection.execute(
+        """
+        SELECT
+            model_item_version_id,
+            diagnosis_code,
+            name,
+            description
+        FROM clinical.diagnoses
+        WHERE model_item_version_id = %s
+        """,
+        (version_id,),
+    ).fetchone()
+
+    assert row == (
+        version_id,
+        "TEST-001",
+        "Test diagnosis",
+        "Test diagnosis description",
+    )
+
+
+def test_observation_protocol_requires_existing_model_item_version(
+    database_connection,
+):
+    nonexistent_version_id = nonexistent_id(
+        database_connection,
+        "research.model_item_versions",
+        "model_item_version_id",
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            diagnosis_version_id,
+            "TEST-001",
+            "Test diagnosis",
+        ),
+    )
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.observation_protocols (
+                model_item_version_id,
+                diagnosis_version_id,
+                protocol_definition
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                nonexistent_version_id,
+                diagnosis_version_id,
+                Json({"steps": []}),
+            ),
+        )
+
+
+def test_observation_protocol_model_item_version_requires_observation_protocol_type(
+    database_connection,
+):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="VARIABLE",
+    )
+
+    version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            diagnosis_version_id,
+            "TEST-001",
+            "Test diagnosis",
+        ),
+    )
+
+    with pytest.raises(
+        psycopg.errors.RaiseException,
+        match="requires type OBSERVATION_PROTOCOL",
+    ):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.observation_protocols (
+                model_item_version_id,
+                diagnosis_version_id,
+                protocol_definition
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                version_id,
+                diagnosis_version_id,
+                Json({"steps": []}),
+            ),
+        )
+
+
+def test_observation_protocol_requires_existing_diagnosis(
+    database_connection,
+):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="OBSERVATION_PROTOCOL",
+    )
+
+    protocol_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    nonexistent_diagnosis_version_id = nonexistent_id(
+        database_connection,
+        "research.model_item_versions",
+        "model_item_version_id",
+    )
+
+    with pytest.raises(psycopg.errors.ForeignKeyViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.observation_protocols (
+                model_item_version_id,
+                diagnosis_version_id,
+                protocol_definition
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                protocol_version_id,
+                nonexistent_diagnosis_version_id,
+                Json({"steps": []}),
+            ),
+        )
+
+
+def test_observation_protocol_model_item_version_is_unique(
+    database_connection,
+):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="OBSERVATION_PROTOCOL",
+    )
+
+    protocol_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            diagnosis_version_id,
+            "TEST-001",
+            "Test diagnosis",
+        ),
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.observation_protocols (
+            model_item_version_id,
+            diagnosis_version_id,
+            protocol_definition
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            protocol_version_id,
+            diagnosis_version_id,
+            Json({"steps": ["assessment"]}),
+        ),
+    )
+
+    with pytest.raises(psycopg.errors.UniqueViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.observation_protocols (
+                model_item_version_id,
+                diagnosis_version_id,
+                protocol_definition
+            )
+            VALUES (%s, %s, %s)
+            """,
+            (
+                protocol_version_id,
+                diagnosis_version_id,
+                Json({"steps": ["treatment"]}),
+            ),
+        )
+
+
+def test_observation_protocol_requires_protocol_definition(
+    database_connection,
+):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="OBSERVATION_PROTOCOL",
+    )
+
+    protocol_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        version_number=1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            diagnosis_version_id,
+            "TEST-001",
+            "Test diagnosis",
+        ),
+    )
+
+    with pytest.raises(psycopg.errors.NotNullViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.observation_protocols (
+                model_item_version_id,
+                diagnosis_version_id,
+                protocol_definition
+            )
+            VALUES (%s, %s, NULL)
+            """,
+            (
+                protocol_version_id,
+                diagnosis_version_id,
+            ),
+        )
+
+
+def test_observation_protocol_allows_valid_protocol(
+    database_connection,
+):
+    protocol_model_item_id, protocol_user_id = create_model_item(
+        database_connection,
+        item_type="OBSERVATION_PROTOCOL",
+    )
+
+    protocol_version_id = create_model_item_version(
+        database_connection,
+        protocol_model_item_id,
+        protocol_user_id,
+        version_number=1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        version_number=1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            diagnosis_version_id,
+            "TEST-001",
+            "Test diagnosis",
+        ),
+    )
+
+    protocol_definition = {
+        "steps": [
+            {
+                "sequence": 1,
+                "action": "initial_assessment",
+            },
+            {
+                "sequence": 2,
+                "action": "reassessment",
+            },
+        ],
+        "eligibility": {
+            "stable": True,
+        },
+    }
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.observation_protocols (
+            model_item_version_id,
+            diagnosis_version_id,
+            protocol_definition
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (
+            protocol_version_id,
+            diagnosis_version_id,
+            Json(protocol_definition),
+        ),
+    )
+
+    row = database_connection.execute(
+        """
+        SELECT
+            model_item_version_id,
+            diagnosis_version_id,
+            protocol_definition
+        FROM clinical.observation_protocols
+        WHERE model_item_version_id = %s
+        """,
+        (protocol_version_id,),
+    ).fetchone()
+
+    assert row[0] == protocol_version_id
+    assert row[1] == diagnosis_version_id
+    assert row[2] == protocol_definition
+
+
+def test_disposition_rule_requires_existing_model_item_version(database_connection):
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (diagnosis_version_id, "TEST-DX", "Test diagnosis"),
+    )
+
+    nonexistent_version_id = nonexistent_id(
+        database_connection,
+        "research.model_item_versions",
+        "model_item_version_id",
+    )
+
+    with pytest.raises(ForeignKeyViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.disposition_rules (
+                model_item_version_id,
+                diagnosis_version_id,
+                destination,
+                rule_definition
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                nonexistent_version_id,
+                diagnosis_version_id,
+                "DISCHARGE",
+                Json({"condition": "stable"}),
+            ),
+        )
