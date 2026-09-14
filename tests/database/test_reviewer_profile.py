@@ -265,3 +265,48 @@ def test_reviewer_experience_requires_existing_profile(database_connection):
                 "EMERGENCY_MEDICINE",
             ),
         )
+
+
+def test_reviewer_specialty_must_match_reviewer_profession(
+    database_connection,
+):
+    reviewer_user_id = create_user(database_connection)
+
+    reviewer_profession_id = create_profession(database_connection)
+
+    other_profession_id = create_profession(database_connection)
+
+    specialty_id = create_specialty(
+        database_connection,
+        other_profession_id,
+    )
+
+    profile = database_connection.execute(
+        """
+        INSERT INTO auth.reviewer_profiles (
+            user_id,
+            profession_id
+        )
+        VALUES (%s, %s)
+        RETURNING reviewer_profile_id
+        """,
+        (
+            reviewer_user_id,
+            reviewer_profession_id,
+        ),
+    ).fetchone()
+
+    with pytest.raises(Exception, match="does not belong to reviewer profession"):
+        database_connection.execute(
+            """
+            INSERT INTO auth.reviewer_specialties (
+                reviewer_profile_id,
+                specialty_id
+            )
+            VALUES (%s, %s)
+            """,
+            (
+                profile[0],
+                specialty_id,
+            ),
+        )

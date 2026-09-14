@@ -231,3 +231,114 @@ def nonexistent_id(connection, table, column):
             """
         )
         return cursor.fetchone()[0]
+
+
+def create_review_assignment(
+    connection,
+    model_item_id=None,
+    reviewer_user_id=None,
+    assigned_by=None,
+    authority_rule_id=None,
+):
+    if model_item_id is None:
+        model_item_id = create_model_item(connection)
+
+    if reviewer_user_id is None:
+        reviewer_user_id = create_user(connection)
+
+    if assigned_by is None:
+        assigned_by = create_user(connection)
+
+    if authority_rule_id is None:
+        authority_rule_id = create_authority_rule(connection)
+
+    return connection.execute(
+        """
+        INSERT INTO research.review_assignments (
+            model_item_id,
+            reviewer_user_id,
+            authority_rule_id,
+            assigned_by
+        )
+        VALUES (%s, %s, %s, %s)
+        RETURNING review_assignment_id
+        """,
+        (
+            model_item_id,
+            reviewer_user_id,
+            authority_rule_id,
+            assigned_by,
+        ),
+    ).fetchone()[0]
+
+
+def create_review(
+    connection,
+    review_assignment_id,
+    model_item_version_id,
+    reviewer_user_id,
+):
+    return connection.execute(
+        """
+        INSERT INTO research.reviews (
+            review_assignment_id,
+            model_item_version_id,
+            reviewer_user_id
+        )
+        VALUES (%s, %s, %s)
+        RETURNING review_id
+        """,
+        (
+            review_assignment_id,
+            model_item_version_id,
+            reviewer_user_id,
+        ),
+    ).fetchone()[0]
+
+
+def create_reviewer_profile(connection):
+    user_id = create_user(connection)
+    profession_id = create_profession(connection)
+
+    reviewer_profile_id = connection.execute(
+        """
+        INSERT INTO auth.reviewer_profiles (
+            user_id,
+            profession_id
+        )
+        VALUES (%s, %s)
+        RETURNING reviewer_profile_id
+        """,
+        (
+            user_id,
+            profession_id,
+        ),
+    ).fetchone()[0]
+
+    return reviewer_profile_id, user_id
+
+
+def create_verified_reviewer(connection):
+    user_id = create_user(connection)
+    profession_id = create_profession(connection)
+
+    profile_id = connection.execute(
+        """
+        INSERT INTO auth.reviewer_profiles (
+            user_id,
+            profession_id,
+            verification_status,
+            verified_at,
+            verified_by
+        )
+        VALUES (%s, %s, 'VERIFIED', NOW(), %s)
+        RETURNING reviewer_profile_id
+        """,
+        (
+            user_id,
+            profession_id,
+            user_id,
+        ),
+    ).fetchone()[0]
+
+    return profile_id, user_id, profession_id
