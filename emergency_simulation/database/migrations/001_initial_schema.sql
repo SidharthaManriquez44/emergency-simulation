@@ -1180,22 +1180,13 @@ BEGIN
       FROM auth.specialties
      WHERE specialty_id = NEW.specialty_id;
 
-    IF reviewer_profession_id IS NULL THEN
-        RAISE EXCEPTION
-            'Reviewer profile % does not exist',
-            NEW.reviewer_profile_id;
-    END IF;
-
-    IF specialty_profession_id IS NULL THEN
-        RAISE EXCEPTION
-            'Specialty % does not exist',
-            NEW.specialty_id;
-    END IF;
-
-    IF reviewer_profession_id <> specialty_profession_id THEN
+    IF reviewer_profession_id IS NOT NULL
+       AND specialty_profession_id IS NOT NULL
+       AND reviewer_profession_id <> specialty_profession_id THEN
         RAISE EXCEPTION
             'Specialty % does not belong to reviewer profession %',
-            NEW.specialty_id, reviewer_profession_id;
+            NEW.specialty_id,
+            reviewer_profession_id;
     END IF;
 
     RETURN NEW;
