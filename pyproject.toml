@@ -5,24 +5,28 @@ description = "Optimization of the Care Process in the Emergency Department of a
 requires-python = ">=3.10"
 
 dependencies = [
-    "sqlfluff",
+    "sqlfluff-4.2.1",
+
 
 ]
 
 [project.optional-dependencies]
 test = [
+    "psycopg-binary-3.3.5",
+    "pytest-asyncio-1.4.0",
     "pytest-cov-7.1.0",
     "pytest-9.1.1",
-    "sqlfluff",
-    "mypy",
-    "ruff",
+    "python-dotenv-1.2.3",
+    "sqlfluff-4.2.1",
+    "mypy-2.3.1",
+    "ruff-0.16.7",
 
 ]
 
 dev = [
-    "mypy",
-    "ruff",
-    "sqlfluff",
+   "sqlfluff-4.2.1",
+    "mypy-2.3.1",
+    "ruff-0.16.7",
 ]
 
 [tool.sqlfluff.core]
