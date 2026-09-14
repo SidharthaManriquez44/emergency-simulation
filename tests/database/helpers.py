@@ -102,7 +102,7 @@ def create_model_item_version(
             (
                 model_item_id,
                 version_number,
-                Json({"description": (f"Version {version_number}")}),
+                Json({"description": f"Version {version_number}"}),
                 user_id,
             ),
         )
