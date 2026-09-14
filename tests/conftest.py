@@ -6,10 +6,11 @@ import pytest
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
 load_dotenv(PROJECT_ROOT / "emergency_simulation" / ".env.test")
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def database_connection():
     connection = psycopg.connect(
         host=os.getenv("POSTGRES_HOST", "localhost"),
@@ -24,7 +25,11 @@ def database_connection():
         ),
         password=os.environ["POSTGRES_PASSWORD"],
     )
-
-    yield connection
-
-    connection.close()
+    # ************************
+    # Now, each test gets an independent connection/transaction.
+    # ************************
+    try:
+        yield connection
+    finally:
+        connection.rollback()
+        connection.close()
