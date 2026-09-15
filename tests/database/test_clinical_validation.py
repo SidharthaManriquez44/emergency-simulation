@@ -1,6 +1,12 @@
 import psycopg
 import pytest
-from psycopg.errors import CheckViolation, ForeignKeyViolation, RaiseException
+from psycopg.errors import (
+    CheckViolation,
+    ForeignKeyViolation,
+    NotNullViolation,
+    RaiseException,
+    UniqueViolation,
+)
 from psycopg.types.json import Json
 
 from tests.database.helpers import (
@@ -2265,3 +2271,377 @@ def test_disposition_rule_requires_existing_model_item_version(database_connecti
                 Json({"condition": "stable"}),
             ),
         )
+
+
+def test_disposition_rule_model_item_version_requires_disposition_rule_type(
+    database_connection,
+):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="VARIABLE",
+    )
+
+    model_item_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (diagnosis_version_id, "TEST-DX", "Test diagnosis"),
+    )
+
+    with pytest.raises(
+        RaiseException,
+        match="requires type DISPOSITION_RULE",
+    ):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.disposition_rules (
+                model_item_version_id,
+                diagnosis_version_id,
+                destination,
+                rule_definition
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                model_item_version_id,
+                diagnosis_version_id,
+                "DISCHARGE",
+                Json({"condition": "stable"}),
+            ),
+        )
+
+
+def test_disposition_rule_requires_existing_diagnosis(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DISPOSITION_RULE",
+    )
+
+    model_item_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        1,
+    )
+
+    nonexistent_diagnosis_version_id = nonexistent_id(
+        database_connection,
+        "clinical.diagnoses",
+        "model_item_version_id",
+    )
+
+    with pytest.raises(ForeignKeyViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.disposition_rules (
+                model_item_version_id,
+                diagnosis_version_id,
+                destination,
+                rule_definition
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                model_item_version_id,
+                nonexistent_diagnosis_version_id,
+                "DISCHARGE",
+                Json({"condition": "stable"}),
+            ),
+        )
+
+
+def test_disposition_rule_model_item_version_is_unique(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DISPOSITION_RULE",
+    )
+
+    model_item_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (diagnosis_version_id, "TEST-DX", "Test diagnosis"),
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.disposition_rules (
+            model_item_version_id,
+            diagnosis_version_id,
+            destination,
+            rule_definition
+        )
+        VALUES (%s, %s, %s, %s)
+        """,
+        (
+            model_item_version_id,
+            diagnosis_version_id,
+            "DISCHARGE",
+            Json({"condition": "stable"}),
+        ),
+    )
+
+    with pytest.raises(UniqueViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.disposition_rules (
+                model_item_version_id,
+                diagnosis_version_id,
+                destination,
+                rule_definition
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                model_item_version_id,
+                diagnosis_version_id,
+                "OBSERVATION",
+                Json({"condition": "requires_observation"}),
+            ),
+        )
+
+
+def test_disposition_rule_destination_must_be_valid(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DISPOSITION_RULE",
+    )
+
+    model_item_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (diagnosis_version_id, "TEST-DX", "Test diagnosis"),
+    )
+
+    with pytest.raises(CheckViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.disposition_rules (
+                model_item_version_id,
+                diagnosis_version_id,
+                destination,
+                rule_definition
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                model_item_version_id,
+                diagnosis_version_id,
+                "INVALID_DESTINATION",
+                Json({"condition": "stable"}),
+            ),
+        )
+
+
+def test_disposition_rule_requires_rule_definition(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DISPOSITION_RULE",
+    )
+
+    model_item_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (diagnosis_version_id, "TEST-DX", "Test diagnosis"),
+    )
+
+    with pytest.raises(NotNullViolation):
+        database_connection.execute(
+            """
+            INSERT INTO clinical.disposition_rules (
+                model_item_version_id,
+                diagnosis_version_id,
+                destination,
+                rule_definition
+            )
+            VALUES (%s, %s, %s, %s)
+            """,
+            (
+                model_item_version_id,
+                diagnosis_version_id,
+                "DISCHARGE",
+                None,
+            ),
+        )
+
+
+def test_disposition_rule_allows_valid_disposition_rule(database_connection):
+    model_item_id, user_id = create_model_item(
+        database_connection,
+        item_type="DISPOSITION_RULE",
+    )
+
+    model_item_version_id = create_model_item_version(
+        database_connection,
+        model_item_id,
+        user_id,
+        1,
+    )
+
+    diagnosis_model_item_id, diagnosis_user_id = create_model_item(
+        database_connection,
+        item_type="DIAGNOSIS",
+    )
+
+    diagnosis_version_id = create_model_item_version(
+        database_connection,
+        diagnosis_model_item_id,
+        diagnosis_user_id,
+        1,
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.diagnoses (
+            model_item_version_id,
+            diagnosis_code,
+            name
+        )
+        VALUES (%s, %s, %s)
+        """,
+        (diagnosis_version_id, "TEST-DX", "Test diagnosis"),
+    )
+
+    database_connection.execute(
+        """
+        INSERT INTO clinical.disposition_rules (
+            model_item_version_id,
+            diagnosis_version_id,
+            destination,
+            rule_definition
+        )
+        VALUES (%s, %s, %s, %s)
+        """,
+        (
+            model_item_version_id,
+            diagnosis_version_id,
+            "DISCHARGE",
+            Json(
+                {
+                    "condition": "stable",
+                    "criteria": ["vital_signs_stable"],
+                }
+            ),
+        ),
+    )
+
+    row = database_connection.execute(
+        """
+        SELECT
+            model_item_version_id,
+            diagnosis_version_id,
+            destination,
+            rule_definition
+        FROM clinical.disposition_rules
+        WHERE model_item_version_id = %s
+        """,
+        (model_item_version_id,),
+    ).fetchone()
+
+    assert row == (
+        model_item_version_id,
+        diagnosis_version_id,
+        "DISCHARGE",
+        {
+            "condition": "stable",
+            "criteria": ["vital_signs_stable"],
+        },
+    )
