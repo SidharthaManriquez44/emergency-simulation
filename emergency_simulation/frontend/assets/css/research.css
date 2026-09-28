@@ -116,7 +116,7 @@
 }
 
 .toc .label {
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.3;
 }
 
@@ -190,7 +190,7 @@ h3 {
 .research-copy {
     font-family: var(--display);
     color: #3f5878;
-    font-size: 17px;
+    font-size: 18px;
     line-height: 1.62;
 }
 
@@ -385,11 +385,12 @@ h3 {
 }
 
 .research-table {
-    width: 100%;
+    width: max-content;
+    max-width: 100%;
     border-collapse: collapse;
     background: #fff;
     font-family: var(--body);
-    font-size: 13px;
+    font-size: 14px;
 }
 
 .research-table th {
@@ -397,7 +398,7 @@ h3 {
     background: #eef5fc;
     border: 1px solid #cfdbe8;
     color: #12396b;
-    text-align: left;
+    text-align: center;
     font-weight: 800;
 }
 
@@ -419,10 +420,15 @@ h3 {
     white-space: nowrap;
 }
 
-.research-table td:nth-child(2) {
-    white-space: nowrap;
+.research-table--center-234 td:nth-child(2),
+.research-table--center-234 td:nth-child(3),
+.research-table--center-234 td:nth-child(4) {
+    text-align: center;
 }
 
+.research-table--center--2 td:nth-child(2) {
+    text-align: center;
+}
 
 /* =========================================================
    09. ESI LEVELS
@@ -949,6 +955,7 @@ h3 {
 }
 
 .reference-usage {
+    grid-column: 2;
     margin-top: 1rem;
 }
 
